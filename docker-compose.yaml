@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - appnet
+      
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: chroma
+    # environment:
+    #   CHROMA_SERVER_HOST: "0.0.0.0"
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      - chroma_data:/data
+    networks:
+      - appnet
+
+  backend:
+    build: ./backend
+    container_name: backend
+    depends_on:
+      - postgres
+      - chroma
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    #   CHROMA_HOST: chroma
+    #   CHROMA_PORT: "8000"
+    ports:
+      - "8001:8001"
+    volumes:
+      - chroma_data:/chroma_data 
+    networks:
+      - appnet
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - appnet
+
+volumes:
+  postgres_data:
+  chroma_data:
+
+networks:
+  appnet:
+    driver: bridge
