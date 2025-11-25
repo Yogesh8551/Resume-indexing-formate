@@ -6,6 +6,8 @@
     body { margin: 30px; font-family: Arial; max-width: 900px; }
     input, button { padding: 8px; width: 100%; margin: 6px 0; }
     .result { border: 1px solid #ccc; padding: 10px; margin-top: 10px; }
+    .result a { margin-right: 10px; text-decoration: none; color: blue; }
+    .result a:hover { text-decoration: underline; }
   </style>
 </head>
 
@@ -30,6 +32,18 @@
 
 <script>
 const BACKEND = "http://localhost:8001";
+
+async function upload() {
+  const fd = new FormData();
+  fd.append("name", document.getElementById("name").value)
+  fd.append("resumetype", document.getElementById("rtype").value)
+  fd.append("occupation", document.getElementById("role").value)
+  fd.append("file", document.getElementById("file").files[0])
+
+  const r = await fetch(`${BACKEND}/ingest`, { method: "POST", body: fd });
+  document.getElementById("uploadResult").innerText = JSON.stringify(await r.json(), null, 2);
+}
+
 async function search() {
   const name = document.getElementById("qname").value.trim();
   const resumetype = document.getElementById("qrtype").value.trim();
@@ -47,9 +61,7 @@ async function search() {
 
   const r = await fetch(`${BACKEND}/search`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 
@@ -68,10 +80,10 @@ async function search() {
         <b>${x.name} - ${x.occupation}</b><br>
         ${x.filename}<br>
         <a href="${BACKEND}/document/${x.chroma_id}" target="_blank">Open Document</a>
+        <a href="${BACKEND}/download/${x.chroma_id}" download="${x.filename}">Download</a>
       </div>`;
   });
 }
-
 </script>
 </body>
 </html>

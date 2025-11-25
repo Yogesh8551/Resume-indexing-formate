@@ -1,4 +1,6 @@
-
+from fastapi.responses import StreamingResponse
+import io
+from fastapi import HTTPException
 import os
 import uuid
 import logging
@@ -166,17 +168,6 @@ async def ingest_resume(
 
     return obj
 
-# @app.post("/search", response_model=list[schemas.ResumeMeta])
-# def search(
-#     name: str = None,
-#     resumetype: str = None,
-#     occupation: str = None,  # comma-separated occupations
-#     db: Session = Depends(db)
-# ):
-#     logger.info(f"🔍 Search called | name={name}, resumetype={resumetype}, occupation={occupation}")
-#     results = crud.query_resumes(db, name, resumetype, occupations=occupation)
-#     logger.info(f"🔍 Found {len(results)} resumes for occupation(s)={occupation}")
-#     return results
 from fastapi import Form
 
 @app.post("/search", response_model=list[schemas.ResumeMeta])
@@ -202,3 +193,26 @@ def document(chroma_id: str):
         "document": res["documents"][0]
     }
 
+
+from fastapi.responses import StreamingResponse
+import io
+from fastapi import HTTPException
+
+@app.get("/download/{chroma_id}")
+def download_document(chroma_id: str):
+    res = col.get(ids=[chroma_id], include=["documents", "metadatas"])
+    if not res or not res["documents"] or not res["documents"][0]:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    content = res["documents"][0]  # text content
+    metadata = res["metadatas"][0]
+    filename = metadata.get("filename", f"{chroma_id}.txt")
+
+    # Convert text to BytesIO for download
+    file_like = io.BytesIO(content.encode("utf-8"))
+
+    return StreamingResponse(
+        file_like,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
