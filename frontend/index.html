@@ -12,6 +12,7 @@
 </head>
 
 <body>
+
 <h2>Upload Resume</h2>
 <input id="name" placeholder="Name">
 <input id="rtype" placeholder="Resume Type">
@@ -33,6 +34,9 @@
 <script>
 const BACKEND = "http://localhost:8001";
 
+// =============================
+// UPLOAD API FUNCTION
+// =============================
 async function upload() {
   const fd = new FormData();
   fd.append("name", document.getElementById("name").value)
@@ -40,29 +44,33 @@ async function upload() {
   fd.append("occupation", document.getElementById("role").value)
   fd.append("file", document.getElementById("file").files[0])
 
-  const r = await fetch(`${BACKEND}/ingest`, { method: "POST", body: fd });
-  document.getElementById("uploadResult").innerText = JSON.stringify(await r.json(), null, 2);
+  const r = await fetch(`${BACKEND}/ingest`, {
+    method: "POST",
+    body: fd
+  });
+
+  document.getElementById("uploadResult").innerText =
+    JSON.stringify(await r.json(), null, 2);
 }
 
+// =============================
+// SEARCH API FUNCTION (FIXED)
+// =============================
 async function search() {
   const name = document.getElementById("qname").value.trim();
   const resumetype = document.getElementById("qrtype").value.trim();
-  let occupation = document.getElementById("qrole").value.trim();
+  const occupation = document.getElementById("qrole").value.trim();
 
-  if (occupation) {
-    occupation = occupation.split(",").map(o => o.trim()).join(",");
-  }
-
-  const body = {
-    name: name || undefined,
-    resumetype: resumetype || undefined,
-    occupation: occupation || undefined
-  };
+  // BUILD FORM URLENCODED BODY (THIS FIXES YOUR ISSUE)
+  const body = new URLSearchParams();
+  if (name) body.append("name", name);
+  if (resumetype) body.append("resumetype", resumetype);
+  if (occupation) body.append("occupation", occupation);
 
   const r = await fetch(`${BACKEND}/search`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
   });
 
   const data = await r.json();
@@ -70,7 +78,7 @@ async function search() {
   div.innerHTML = "";
 
   if (!data || data.length === 0) {
-    div.innerHTML = "<p>No resumes found for this query.</p>";
+    div.innerHTML = "<p>No resumes found.</p>";
     return;
   }
 
@@ -78,12 +86,18 @@ async function search() {
     div.innerHTML += `
       <div class="result">
         <b>${x.name} - ${x.occupation}</b><br>
-        ${x.filename}<br>
+        ${x.filename}<br><br>
+
         <a href="${BACKEND}/document/${x.chroma_id}" target="_blank">Open Document</a>
-        <a href="${BACKEND}/download/${x.chroma_id}" download="${x.filename}">Download</a>
-      </div>`;
+        &nbsp; | &nbsp;
+        <a href="${BACKEND}/download/${x.chroma_id}" download="${x.filename}">
+          Download
+        </a>
+      </div>
+    `;
   });
 }
+
 </script>
 </body>
 </html>

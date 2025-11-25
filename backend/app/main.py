@@ -192,27 +192,3 @@ def document(chroma_id: str):
         "metadata": res["metadatas"][0],
         "document": res["documents"][0]
     }
-
-
-from fastapi.responses import StreamingResponse
-import io
-from fastapi import HTTPException
-
-@app.get("/download/{chroma_id}")
-def download_document(chroma_id: str):
-    res = col.get(ids=[chroma_id], include=["documents", "metadatas"])
-    if not res or not res["documents"] or not res["documents"][0]:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    content = res["documents"][0]  # text content
-    metadata = res["metadatas"][0]
-    filename = metadata.get("filename", f"{chroma_id}.txt")
-
-    # Convert text to BytesIO for download
-    file_like = io.BytesIO(content.encode("utf-8"))
-
-    return StreamingResponse(
-        file_like,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
