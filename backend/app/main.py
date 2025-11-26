@@ -180,15 +180,61 @@ def search(
     results = crud.query_resumes(db, name, resumetype, occupation)
     return results
 
+# @app.get("/document/{chroma_id}")
+# def document(chroma_id: str):
+#     res = col.get(ids=[chroma_id], include=["documents", "metadatas"])
+
+#     if not res or not res["documents"] or not res["documents"][0]:
+#         raise HTTPException(status_code=404, detail="Document not found")
+
+#     return {
+#         "chroma_id": chroma_id,
+#         "metadata": res["metadatas"][0],
+#         "document": res["documents"][0]
+#     }
+
+import re
+from fastapi import HTTPException
+
+def extract_section(text, title):
+    pattern = rf"{title}[\s\S]*?(?=\n[A-Z][A-Z ]+:|\Z)"
+    match = re.search(pattern, text, re.IGNORECASE)
+    return match.group(0).replace(title, "").strip() if match else None
+
 @app.get("/document/{chroma_id}")
 def document(chroma_id: str):
     res = col.get(ids=[chroma_id], include=["documents", "metadatas"])
 
-    if not res or not res["documents"] or not res["documents"][0]:
+    if not res or not res["documents"]:
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    full_text = res["documents"][0]
 
-    return {
-        "chroma_id": chroma_id,
-        "metadata": res["metadatas"][0],
-        "document": res["documents"][0]
+    # ----------- SECTION EXTRACTION ----------- #
+    contacts = extract_section(full_text, "CONTACT INFORMATION")
+    summary = extract_section(full_text, "SUMMARY")
+    skills = extract_section(full_text, "SKILLS AND TOOLS")
+    experience = extract_section(full_text, "PROFESSIONAL EXPERIENCE")
+    certifications = extract_section(full_text, "Certifications and Badges")
+
+    # Bullet points extract clean array
+    contact_list = re.findall(r"[•\-]\s*(.*)", contacts or "")
+    skill_list = re.findall(r"•\s*(.*)", skills or "")
+    exp_points = re.findall(r"•\s*(.*)", experience or "")
+    cert_list = re.findall(r"•\s*(.*)", certifications or "")
+
+    final_output = {
+        "1. Basic Details": {
+            "Name": res["metadatas"][0].get("name"),
+            "Resume Type": res["metadatas"][0].get("resumetype"),
+            "Occupation": res["metadatas"][0].get("occupation"),
+            "Filename": res["metadatas"][0].get("filename")
+        },
+        "2. Summary": summary,
+        "3. Technical Skills": skill_list,
+        "4. Professional Experience": exp_points,
+        "5. Certifications": cert_list,
+        "6. Contact Information": contact_list
     }
+
+    return final_output

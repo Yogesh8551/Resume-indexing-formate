@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
   <title>Resume Query UI</title>
@@ -89,15 +89,417 @@ async function search() {
         ${x.filename}<br><br>
 
         <a href="${BACKEND}/document/${x.chroma_id}" target="_blank">Open Document</a>
-        &nbsp; | &nbsp;
-        <a href="${BACKEND}/download/${x.chroma_id}" download="${x.filename}">
-          Download
-        </a>
+        &nbsp;
       </div>
     `;
   });
 }
 
+</script>
+</body>
+</html> -->
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Resume Query + Viewer</title>
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#ffffff; --muted:#666; --accent:#2b7be4;
+      --pad:14px; --radius:10px;
+    }
+    body{
+      font-family: Inter, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      margin:20px;
+      color:#111;
+      max-width:1100px;
+    }
+
+    h1{margin:0 0 12px 0}
+    .row{display:flex; gap:18px; align-items:flex-start;}
+    .col{flex:1}
+
+    .card{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:var(--pad);
+      box-shadow:0 6px 18px rgba(33,40,50,0.06);
+      margin-bottom:18px;
+    }
+
+    input, button, select, textarea {
+      width:100%;
+      padding:10px;
+      font-size:14px;
+      border:1px solid #e2e6ef;
+      border-radius:8px;
+      box-sizing:border-box;
+    }
+
+    label{font-size:13px; color:var(--muted); margin-bottom:6px; display:block}
+    small{color:var(--muted)}
+
+    button.primary{
+      background:var(--accent); color:#fff; border:0;
+      padding:10px 14px; cursor:pointer; border-radius:8px;
+    }
+    button.ghost{
+      background:transparent; color:var(--accent); border:1px solid #d7e6ff;
+    }
+
+    .results-list { margin-top:10px; }
+    .result-item{
+      border-left:4px solid #eef6ff;
+      padding:10px; margin-bottom:10px; border-radius:8px;
+    }
+    .result-item b{display:block; margin-bottom:6px}
+    .actions{margin-top:8px}
+    .link-btn{color:var(--accent); cursor:pointer; text-decoration:underline; background:none;border:0;padding:0;font-size:13px}
+
+    /* viewer */
+    #viewer{min-height:120px}
+    .section{margin-bottom:14px}
+    .section h3{margin:0 0 8px 0}
+    .kv{display:flex; gap:8px; margin-bottom:6px}
+    .kv .k{width:160px;color:var(--muted)}
+    pre { background:#fafafa; padding:12px; border-radius:8px; overflow:auto; white-space:pre-wrap; }
+    ul.skills{padding-left:18px; margin:6px 0}
+    .controls{display:flex; gap:8px; justify-content:flex-end; margin-bottom:8px}
+    .small-muted{font-size:13px;color:var(--muted)}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+
+  <h1>Resume Uploader · Search · Viewer</h1>
+
+  <div class="row">
+    <div class="col">
+      <div class="card">
+        <h2 style="margin-top:0">Upload Resume</h2>
+        <label>Name</label>
+        <input id="name" placeholder="John Doe">
+        <label>Resume Type</label>
+        <input id="rtype" placeholder="fresher / experienced">
+        <label>Occupation</label>
+        <input id="role" placeholder="devops, frontend, civil">
+        <label>File</label>
+        <input type="file" id="file">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <button class="primary" onclick="upload()">Upload</button>
+          <button class="ghost" onclick="clearUpload()">Clear</button>
+        </div>
+
+        <pre id="uploadResult" class="small-muted" style="margin-top:10px"></pre>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">Search Resumes</h2>
+        <label>Filter - Name</label>
+        <input id="qname" placeholder="Name">
+        <label>Filter - Resume Type</label>
+        <input id="qrtype" placeholder="Resume Type">
+        <label>Filter - Occupation</label>
+        <input id="qrole" placeholder="Occupation">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <button class="primary" onclick="search()">Search</button>
+          <button class="ghost" onclick="clearSearch()">Clear</button>
+        </div>
+
+        <div id="results" class="results-list" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="col" style="min-width:420px;">
+      <div class="card">
+        <div class="controls">
+          <div style="flex:1"><small class="small-muted">Document Viewer — shows structured JSON nicely</small></div>
+          <div>
+            <button class="ghost" id="toggleFullBtn" onclick="toggleFull()" disabled>Show Full JSON</button>
+            <button class="ghost" id="downloadBtn" onclick="downloadJSON()" disabled>Download JSON</button>
+          </div>
+        </div>
+
+        <div id="viewer">
+          <div id="viewerEmpty" class="small-muted">Open a resume from search results to view details here.</div>
+          <div id="viewerContent" class="hidden">
+            <div id="basicDetails" class="section"></div>
+            <div id="summary" class="section"></div>
+            <div id="skills" class="section"></div>
+            <div id="experience" class="section"></div>
+            <div id="certifications" class="section"></div>
+            <div id="fullDoc" class="section hidden">
+              <h3>Full Document</h3>
+              <pre id="fullDocPre"></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+const BACKEND = "http://localhost:8001";
+
+// ---------------- Upload ----------------
+async function upload(){
+  const fileEl = document.getElementById("file");
+  if(!fileEl.files || fileEl.files.length===0){
+    alert("Choose a file first");
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("name", document.getElementById("name").value)
+  fd.append("resumetype", document.getElementById("rtype").value)
+  fd.append("occupation", document.getElementById("role").value)
+  fd.append("file", fileEl.files[0])
+
+  document.getElementById("uploadResult").innerText = "Uploading..."
+  try{
+    const res = await fetch(`${BACKEND}/ingest`, { method: "POST", body: fd });
+    if(!res.ok){
+      const txt = await res.text();
+      document.getElementById("uploadResult").innerText = "Upload failed: " + txt;
+      return;
+    }
+    const data = await res.json();
+    document.getElementById("uploadResult").innerText = JSON.stringify(data, null, 2);
+    // Auto-add to results list for convenience
+    prependResultToList(data);
+  }catch(err){
+    document.getElementById("uploadResult").innerText = "Upload error: " + err;
+  }
+}
+function clearUpload(){
+  document.getElementById("name").value = "";
+  document.getElementById("rtype").value = "";
+  document.getElementById("role").value = "";
+  document.getElementById("file").value = "";
+  document.getElementById("uploadResult").innerText = "";
+}
+
+// ---------------- Search ----------------
+async function search(){
+  const name = document.getElementById("qname").value.trim();
+  const resumetype = document.getElementById("qrtype").value.trim();
+  const occupation = document.getElementById("qrole").value.trim();
+
+  const body = new URLSearchParams();
+  if(name) body.append("name", name);
+  if(resumetype) body.append("resumetype", resumetype);
+  if(occupation) body.append("occupation", occupation);
+
+  const r = await fetch(`${BACKEND}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString()
+  });
+
+  const data = await r.json();
+  renderResults(data);
+}
+function clearSearch(){
+  document.getElementById("qname").value = "";
+  document.getElementById("qrtype").value = "";
+  document.getElementById("qrole").value = "";
+  document.getElementById("results").innerHTML = "";
+}
+
+// ---------------- Results rendering ----------------
+function renderResults(data){
+  const div = document.getElementById("results");
+  div.innerHTML = "";
+  if(!data || data.length===0){
+    div.innerHTML = "<div class='small-muted'>No resumes found.</div>";
+    return;
+  }
+
+  data.forEach(x => {
+    const item = document.createElement("div");
+    item.className = "result-item";
+
+    const title = document.createElement("b");
+    title.innerText = `${x.name || "(no name)"} — ${x.occupation || ""}`;
+    item.appendChild(title);
+
+    const fn = document.createElement("div");
+    fn.innerText = x.filename || "";
+    fn.style.marginBottom = "8px";
+    item.appendChild(fn);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const openBtn = document.createElement("button");
+    openBtn.className = "link-btn";
+    openBtn.innerText = "Open Document";
+    openBtn.onclick = ()=> viewDocument(x.chroma_id);
+    actions.appendChild(openBtn);
+
+    // quick inspect JSON
+    const inspectBtn = document.createElement("button");
+    inspectBtn.className = "link-btn";
+    inspectBtn.style.marginLeft = "12px";
+    inspectBtn.innerText = "View Raw JSON";
+    inspectBtn.onclick = async ()=> {
+      const r = await fetch(`${BACKEND}/document/${x.chroma_id}`);
+      const d = await r.json();
+      alert(JSON.stringify(d, null, 2));
+    }
+    actions.appendChild(inspectBtn);
+
+    item.appendChild(actions);
+    div.appendChild(item);
+  });
+}
+
+function prependResultToList(obj){
+  // useful after ingest; show item in results
+  const div = document.getElementById("results");
+  const data = [obj];
+  const existing = div.firstChild;
+  renderResults(data.concat([]));
+  // not perfect ordering — acceptable for quick flow
+}
+
+// ---------------- Viewer ----------------
+let currentJSON = null;
+let showFull = false;
+
+async function viewDocument(chroma_id){
+  const viewerEmpty = document.getElementById("viewerEmpty");
+  const viewerContent = document.getElementById("viewerContent");
+  viewerEmpty.classList.add("hidden");
+  viewerContent.classList.remove("hidden");
+
+  // enable controls
+  document.getElementById("toggleFullBtn").disabled = false;
+  document.getElementById("downloadBtn").disabled = false;
+  document.getElementById("toggleFullBtn").innerText = "Show Full JSON";
+
+  document.getElementById("basicDetails").innerHTML = "<small class='small-muted'>Loading...</small>";
+  document.getElementById("summary").innerHTML = "";
+  document.getElementById("skills").innerHTML = "";
+  document.getElementById("experience").innerHTML = "";
+  document.getElementById("certifications").innerHTML = "";
+  document.getElementById("fullDocPre").innerText = "";
+
+  try{
+    const res = await fetch(`${BACKEND}/document/${chroma_id}`);
+    if(!res.ok){
+      const t = await res.text();
+      document.getElementById("basicDetails").innerHTML = `<span class="small-muted">Error: ${t}</span>`;
+      return;
+    }
+    const data = await res.json();
+    currentJSON = data; // store for download/toggle
+
+    // Basic details
+    const b = data["1. Basic Details"] || data["Basic Details"] || {};
+    let basicHtml = "<h3>Basic Details</h3>";
+    for(const k of Object.keys(b)){
+      basicHtml += `<div class="kv"><div class="k">${k}</div><div class="v">${escapeHtml(b[k]||"")}</div></div>`;
+    }
+    document.getElementById("basicDetails").innerHTML = basicHtml;
+
+    // Summary
+    const summaryText = data["2. Summary"] || data["Summary"] || "";
+    const summaryHtml = `<h3>Summary</h3><pre>${escapeHtml(summaryText || "(no summary)")}</pre>`;
+    document.getElementById("summary").innerHTML = summaryHtml;
+
+    // Skills
+    const skills = data["3. Technical Skills"] || data["Skills"] || [];
+    let skillsHtml = "<h3>Technical Skills</h3>";
+    if(Array.isArray(skills) && skills.length>0){
+      skillsHtml += "<ul class='skills'>";
+      skills.forEach(s => skillsHtml += `<li>${escapeHtml(s)}</li>`);
+      skillsHtml += "</ul>";
+    } else {
+      // attempt to extract from Summary if not present
+      skillsHtml += `<div class="small-muted">(no separate skills array)</div>`;
+    }
+    document.getElementById("skills").innerHTML = skillsHtml;
+
+    // Experience
+    const exp = data["4. Professional Experience"] || data["Experience"] || [];
+    let expHtml = "<h3>Professional Experience</h3>";
+    if(Array.isArray(exp) && exp.length>0){
+      expHtml += "<ul class='skills'>";
+      exp.forEach(e => expHtml += `<li>${escapeHtml(e)}</li>`);
+      expHtml += "</ul>";
+    } else {
+      expHtml += `<div class="small-muted">(no structured experience entries)</div>`;
+    }
+    document.getElementById("experience").innerHTML = expHtml;
+
+    // Certifications
+    const certs = data["5. Certifications"] || data["Certifications"] || [];
+    let certHtml = "<h3>Certifications</h3>";
+    if(Array.isArray(certs) && certs.length>0){
+      certHtml += "<ul class='skills'>";
+      certs.forEach(c => certHtml += `<li>${escapeHtml(c)}</li>`);
+      certHtml += "</ul>";
+    } else {
+      certHtml += `<div class="small-muted">(no certifications listed)</div>`;
+    }
+    document.getElementById("certifications").innerHTML = certHtml;
+
+    // Full document
+    const fullDoc = data["6. Full Document"] || data["Full Document"] || null;
+    if(fullDoc && fullDoc !== "Available fully if needed using ?full=true"){
+      document.getElementById("fullDocPre").innerText = fullDoc;
+    } else {
+      // also try to show raw "document" field if present in metadata sections (chroma output)
+      if(data["document"]) document.getElementById("fullDocPre").innerText = data["document"];
+    }
+
+    // reset toggle state
+    showFull = false;
+    toggleFull(false);
+  }catch(err){
+    document.getElementById("basicDetails").innerHTML = `<span class="small-muted">Error: ${err}</span>`;
+  }
+}
+
+function toggleFull(forceState){
+  const section = document.getElementById("fullDoc");
+  const btn = document.getElementById("toggleFullBtn");
+  if(typeof forceState === "boolean") showFull = forceState;
+  showFull = !showFull && (forceState===undefined ? true : showFull);
+  // the above keeps behavior: calling toggleFull() toggles; calling toggleFull(false) sets false
+
+  if(!showFull){
+    section.classList.add("hidden");
+    btn.innerText = "Show Full JSON";
+  } else {
+    section.classList.remove("hidden");
+    btn.innerText = "Hide Full JSON";
+  }
+}
+
+function downloadJSON(){
+  if(!currentJSON) return;
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentJSON, null, 2));
+  const dl = document.createElement("a");
+  dl.setAttribute("href", dataStr);
+  const filename = (currentJSON["1. Basic Details"]?.Name || "resume") + ".json";
+  dl.setAttribute("download", filename);
+  document.body.appendChild(dl);
+  dl.click();
+  dl.remove();
+}
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return "";
+  return String(str)
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;");
+}
 </script>
 </body>
 </html>

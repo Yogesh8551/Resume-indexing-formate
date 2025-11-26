@@ -9,20 +9,37 @@ def create_resume(db: Session, **data):
     db.refresh(obj)
     return obj
 
-def query_resumes(db: Session, name=None, resumetype=None, occupations=None):
-    # """
-    # occupations: comma-separated string like "devops,civil"
-    # """
+# def query_resumes(db: Session, name=None, resumetype=None, occupations=None):
+#     # """
+#     # occupations: comma-separated string like "devops,civil"
+#     # """
+#     q = db.query(Resume)
+
+#     # Exact match for multiple occupations (case-insensitive)
+#     if occupations:
+#         occupation_list = [occ.strip().lower() for occ in occupations.split(",")]
+#         q = q.filter(func.lower(func.trim(Resume.occupation)).in_(occupation_list))
+
+#     # Optional: exact match for name/resumetype (partial match)
+#     if name:
+#         q = q.filter(Resume.name.ilike(f"%{name}%"))
+#     if resumetype:
+#         q = q.filter(Resume.resumetype.ilike(f"%{resumetype}%"))
+
+#     return q.all()
+def query_resumes(db: Session, name=None, resumetype=None, occupation=None):
+
     q = db.query(Resume)
 
-    # Exact match for multiple occupations (case-insensitive)
-    if occupations:
-        occupation_list = [occ.strip().lower() for occ in occupations.split(",")]
-        q = q.filter(func.lower(func.trim(Resume.occupation)).in_(occupation_list))
+    # occupation filter - exact match ignoring case + trimming
+    if occupation:
+        q = q.filter(func.lower(func.trim(Resume.occupation)) == occupation.lower().strip())
 
-    # Optional: exact match for name/resumetype (partial match)
+    # name filter (partial)
     if name:
         q = q.filter(Resume.name.ilike(f"%{name}%"))
+
+    # resume type filter (partial)
     if resumetype:
         q = q.filter(Resume.resumetype.ilike(f"%{resumetype}%"))
 
