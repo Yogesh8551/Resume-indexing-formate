@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from .models import Resume
+import logging
+logger = logging.getLogger("CRUD_LOGS")
+
 
 def create_resume(db: Session, **data):
     obj = Resume(**data)
